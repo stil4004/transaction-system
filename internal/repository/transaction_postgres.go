@@ -65,7 +65,7 @@ func (r *TransactionPostgres) GetBalance() ([]bs.Answer, error) {
 		(SELECT wallet_id, status, ROW_NUMBER() OVER (PARTITION BY wallet_id ORDER BY id DESC) 
 		AS rn FROM %s) t1 ON t1.wallet_id = t2.wallet_id WHERE t1.rn = 1 AND t1.status != 'Error'`, WalletTable, TransacitonTable)
 	err := r.db.Select(&list, query)
-	
+
 	return list, err
 }
 
@@ -80,6 +80,7 @@ func (r TransactionPostgres) CreateTransaction(wallet_id uint64, currency string
 	st := fmt.Sprintf("INSERT INTO %s (wallet_id, currency, sum) VALUES ($1, $2, $3) RETURNING id", TransacitonTable)
 	row := r.db.QueryRow(st, wallet_id, currency, sum)
 	err := row.Scan(&id)
+	
 	if err != nil {
 		log.Println(err.Error())
 	}
