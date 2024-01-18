@@ -1,2 +1,2 @@
-DROP TABLE Wallet;
-DROP TABLE Transaction;
+DROP TABLE Wallets;
+DROP TABLE Transactions;

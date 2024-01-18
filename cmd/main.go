@@ -40,8 +40,13 @@ func main() {
 		log.Printf("failed conection with BD %s\n", err.Error())
 	}
 	err = StartDataBase(db)
-	
 	if err != nil {
+		log.Printf("failed inserting to BD %s\n", err.Error())
+		panic(err)
+	}
+
+	err = testIputDB(db)
+	if err != nil{
 		log.Printf("failed inserting to BD %s\n", err.Error())
 	}
 
@@ -57,7 +62,7 @@ func main() {
 		}
 	}()
 
-	log.Print("Runing...")
+	log.Print("Running...")
 
 	ext := make(chan os.Signal, 1)
 	signal.Notify(ext, syscall.SIGTERM, syscall.SIGINT)
@@ -82,16 +87,19 @@ func initConfig() error {
 }
 
 func StartDataBase(db *sqlx.DB) error {
-	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS Wallet(
-		wallet_id bigint not null unique,
-		USDT float default 0,
-		RUB float default 0,
-		EUR float default 0)`)
+	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS Wallets(
+		wallet_id bigint not null,
+		currency char(20) default 'RUB' not null,
+		value float default 0 not null,
+		PRIMARY KEY (wallet_id, currency));
+		
+		CREATE INDEX ix_wallets_person_id ON Wallets (wallet_id, currency);`)
 		
 	if err != nil {
 		log.Println(err)
 	}	
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS Transaction(id serial not null unique,
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS Transactions(
+		id serial not null unique,
 		wallet_id bigint not null,
 		currency char(100) not null,
 		sum float,
@@ -99,11 +107,23 @@ func StartDataBase(db *sqlx.DB) error {
 	if err != nil {
 		log.Println(err)
 	}		
-	_, err = db.Exec(`INSERT INTO Wallet (wallet_id) VALUES (5435452135151251)`)
+	// _, err = db.Exec(`INSERT INTO Wallets (wallet_id) VALUES (5435452135151251)`)
+	// if err != nil {
+	// 	log.Println(err)
+	// }	
+	// _, err = db.Exec(`INSERT INTO Wallets (wallet_id) VALUES (1251513451454616)`)
+	// if err != nil {
+	// 	log.Println(err)
+	// }	
+	return err
+}
+
+func testIputDB(db *sqlx.DB) error {
+	_, err := db.Exec(`INSERT INTO Wallets (wallet_id) VALUES (5435452135151251)`)
 	if err != nil {
 		log.Println(err)
 	}	
-	_, err = db.Exec(`INSERT INTO Wallet (wallet_id) VALUES (1251513451454616)`)
+	_, err = db.Exec(`INSERT INTO Wallets (wallet_id) VALUES (1251513451454616)`)
 	if err != nil {
 		log.Println(err)
 	}	

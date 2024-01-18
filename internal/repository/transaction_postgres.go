@@ -2,6 +2,7 @@ package repository
 
 import (
 	"bs"
+	"database/sql"
 	"fmt"
 	"log"
 
@@ -23,14 +24,16 @@ func NewTransactionPostgres(db *sqlx.DB) *TransactionPostgres {
 
 func (r *TransactionPostgres) AddSum(user bs.Request) error {
 
+	// Добавляем транзакцию в таблицу (Если потом пойдет не так поменяем на ошибочное) 
 	var id int
 	id, err := r.CreateTransaction(user.WalletID, user.Currency, user.Sum)
 	if err != nil {
 		return err
 	}
 
-	st := fmt.Sprintf("UPDATE %s SET ? = ? + ? WHERE wallet_id = ? ", WalletTable)
-	_, err = r.db.Exec(st, user.Currency, user.Currency, user.Sum, user.WalletID)
+	// Добавляем к уже существующему значению новую сумму
+	st := fmt.Sprintf("UPDATE %s SET value = value + $1 WHERE wallet_id = $2 AND currency = $3", WalletTable)
+	_, err = r.db.Exec(st, user.Sum, user.WalletID, user.Currency)
 	if err != nil {
 		r.UpdateStatus(Status_neg, id)
 		return err
@@ -38,6 +41,24 @@ func (r *TransactionPostgres) AddSum(user bs.Request) error {
 	
 	r.UpdateStatus(Status_pos, id)
 	return err
+
+}
+
+func (r *TransactionPostgres) AddWallet(user bs.Request) error {
+
+	var id int
+	id, err := r.CreateTransaction(user.WalletID, user.Currency, user.Sum)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(`INSERT INTO Wallets (wallet_id, currency, value) VALUES ($1, $2, $3)`, user.WalletID, user.Currency, user.Sum)
+	if err != nil {
+		r.UpdateStatus(Status_neg, id)
+		return err
+	}	
+	r.UpdateStatus(Status_pos, id)
+	return nil
 
 }
 
@@ -49,19 +70,8 @@ func (r *TransactionPostgres) TakeOff(user bs.Request) error {
 		return err
 	}
 
-	// var sum float64
-	// st := fmt.Sprintf("SELECT ? FROM %s WHERE wallet_id = ?", WalletTable)
-	// if err := r.db.Get(&sum, st, user.Currency, user.WalletID); err != nil {
-	// 	return err
-	// }
-
-	// if sum-user.Sum < 0 {
-	// 	r.UpdateStatus(Status_neg, id)
-	// 	return nil
-	// }
-
-	Take_money := fmt.Sprintf("UPDATE %s SET ? = ? - ? WHERE wallet_id = ? ", WalletTable)
-	_, err = r.db.Exec(Take_money, user.Currency, user.Currency, user.Sum, user.WalletID)
+	Take_money := fmt.Sprintf("UPDATE %s SET value = value - $1 WHERE wallet_id = $2 and currency = $3", WalletTable)
+	_, err = r.db.Exec(Take_money, user.Sum, user.WalletID, user.Currency)
 	if err != nil {
 		r.UpdateStatus(Status_neg, id)
 		return err
@@ -102,10 +112,26 @@ func (r *TransactionPostgres) CreateTransaction(wallet_id uint64, currency strin
 
 func (r *TransactionPostgres) GetBalanceByID(walletID uint64, currency string) (float64, error){
 	var reqBalance float64
-	st := fmt.Sprintf("SELECT ? FROM %s WHERE wallet_id = ?", WalletTable)
-	if err := r.db.Get(&reqBalance, st, currency, walletID); err != nil {
+	st := fmt.Sprintf("SELECT value FROM %s WHERE wallet_id = $1 and currency ILIKE $2", WalletTable)
+	if err := r.db.Get(&reqBalance, st, walletID, "%" + currency + "%"); err != nil {
+		fmt.Println("JA tut suka")
 		return 0.0, err
 	}
 	return reqBalance, nil
+
+}
+
+func (r *TransactionPostgres) HasCurrency(walletID uint64, currency string) (bool, error){
+
+	st := fmt.Sprintf("SELECT value FROM %s WHERE wallet_id = $1 and currency ILIKE $2", WalletTable)
+	row := r.db.QueryRow(st, walletID, "%" + currency + "%")
+
+	var temp any
+	if err := row.Scan(&temp); err == sql.ErrNoRows {
+		return false, nil
+	} else if err != nil{
+		return false, err
+	}
+	return true, nil
 
 }

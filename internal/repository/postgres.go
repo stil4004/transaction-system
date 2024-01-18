@@ -2,12 +2,13 @@ package repository
 
 import (
 	"fmt"
+
 	"github.com/jmoiron/sqlx"
 )
 
 const (
-	TransacitonTable = "Transaction"
-	WalletTable      = "Wallet"
+	TransacitonTable = "Transactions"
+	WalletTable      = "Wallets"
 )
 
 type Config struct {
