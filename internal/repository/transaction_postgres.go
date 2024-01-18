@@ -32,8 +32,8 @@ func (r *TransactionPostgres) AddSum(user bs.Request) error {
 	}
 
 	// Добавляем к уже существующему значению новую сумму
-	st := fmt.Sprintf("UPDATE %s SET value = value + $1 WHERE wallet_id = $2 AND currency = $3", WalletTable)
-	_, err = r.db.Exec(st, user.Sum, user.WalletID, user.Currency)
+	st := fmt.Sprintf("UPDATE %s SET value = ROUND (CAST(value AS numeric) + $1, 2) WHERE wallet_id = $2 and currency ILIKE $3", WalletTable)
+	_, err = r.db.Exec(st, user.Sum, user.WalletID, "%" + user.Currency + "%")
 	if err != nil {
 		r.UpdateStatus(Status_neg, id)
 		return err
@@ -70,7 +70,7 @@ func (r *TransactionPostgres) TakeOff(user bs.Request) error {
 		return err
 	}
 
-	Take_money := fmt.Sprintf("UPDATE %s SET value = value - $1 WHERE wallet_id = $2 and currency ILIKE $3", WalletTable)
+	Take_money := fmt.Sprintf("UPDATE %s SET value = ROUND (CAST(value AS numeric) - $1, 2) WHERE wallet_id = $2 and currency ILIKE $3", WalletTable)
 	_, err = r.db.Exec(Take_money, user.Sum, user.WalletID, "%" + user.Currency + "%")
 	if err != nil {
 		r.UpdateStatus(Status_neg, id)
@@ -81,36 +81,98 @@ func (r *TransactionPostgres) TakeOff(user bs.Request) error {
 	return err
 }
 
+// func (r *TransactionPostgres) TransferTo(transf bs.Transfer) error {
+// 	id1, err := r.CreateTransaction(transf.WalletID_from, transf.Currency, transf.Sum)
+// 	if err != nil{
+// 	 	return err
+// 	}
+	
+// 	id2, err := r.CreateTransaction(transf.WalletID_to, transf.Currency, transf.Sum)
+// 	if err != nil{
+// 	 	return err
+// 	}
+
+// 	trans_query := `
+// 	BEGIN;
+// 		UPDATE wallets SET value = value - $1 
+// 			WHERE wallet_id = $2 and currency = $3;
+// 		UPDATE wallets SET value = value + $1 
+// 			WHERE wallet_id = $4 AND currency = $3;
+// 	COMMIT;
+// 	`
+// 	_, err = r.db.Exec(trans_query, transf.Sum, transf.WalletID_from, "%" + transf.Currency + "%", transf.WalletID_to )
+// 	if err != nil {
+// 		r.UpdateStatus(Status_neg, id1)
+// 		r.UpdateStatus(Status_neg, id2)
+// 		return err
+// 	}
+
+// 	r.UpdateStatus(Status_pos, id1)
+// 	r.UpdateStatus(Status_pos, id2)
+
+// 	return err
+// }
+
 func (r *TransactionPostgres) TransferTo(transf bs.Transfer) error {
 	id1, err := r.CreateTransaction(transf.WalletID_from, transf.Currency, transf.Sum)
-	if err != nil{
-	 	return err
-	}
+ 	if err != nil{
+ 	 	return err
+ 	}
 	
-	id2, err := r.CreateTransaction(transf.WalletID_to, transf.Currency, transf.Sum)
-	if err != nil{
-	 	return err
-	}
+ 	id2, err := r.CreateTransaction(transf.WalletID_to, transf.Currency, transf.Sum)
+ 	if err != nil{
+		r.UpdateStatus(Status_neg, id1)
+ 	 	return err
+ 	}
 
-	trans_query := `
-	BEGIN;
-		UPDATE wallets SET value = value - $1 
-			WHERE wallet_id = $2 and currency = $3;
-		UPDATE wallets SET value = value + $1 
-			WHERE wallet_id = $4 AND currency = $3;
-	COMMIT;
-	`
-	_, err = r.db.Exec(trans_query, transf.Sum, transf.WalletID_from, "%" + transf.Currency + "%", transf.WalletID_to )
+	tx, err := r.db.Begin()
+    if err != nil {
+		r.UpdateStatus(Status_neg, id1)
+		r.UpdateStatus(Status_neg, id2)
+        return err
+    }
+	stmt, err := tx.Prepare(`
+		UPDATE wallets SET value = ROUND (CAST(value AS numeric) - $1, 2)
+	 	WHERE wallet_id = $2 and currency ILIKE $3;
+	`)
 	if err != nil {
+		tx.Rollback()
 		r.UpdateStatus(Status_neg, id1)
 		r.UpdateStatus(Status_neg, id2)
 		return err
-	}
+	}	
+	defer stmt.Close()
+
+	if _, err := stmt.Exec(transf.Sum, transf.WalletID_from, "%" + transf.Currency + "%"); err != nil {
+        tx.Rollback() 
+		r.UpdateStatus(Status_neg, id1)
+		r.UpdateStatus(Status_neg, id2)
+        return err
+    }
+
+    stmt, err = tx.Prepare(`
+		UPDATE wallets SET value = ROUND (CAST(value AS numeric) + $1, 2)
+		WHERE wallet_id = $2 AND currency ILIKE $3;
+	`)
+    if err != nil {
+        tx.Rollback()
+		r.UpdateStatus(Status_neg, id1)
+		r.UpdateStatus(Status_neg, id2)
+        return err
+    }
+    defer stmt.Close()
+
+    if _, err := stmt.Exec(transf.Sum, transf.WalletID_to, "%" + transf.Currency + "%"); err != nil {
+        tx.Rollback() 
+		r.UpdateStatus(Status_neg, id1)
+		r.UpdateStatus(Status_neg, id2)
+        return err
+    }
 
 	r.UpdateStatus(Status_pos, id1)
 	r.UpdateStatus(Status_pos, id2)
 
-	return err
+    return tx.Commit()
 }
 
 func (r *TransactionPostgres) GetBalance() ([]bs.Answer, error) {
