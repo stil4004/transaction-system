@@ -9,8 +9,8 @@ type Transactions interface {
 	AddSum(user bs.Request) error
 	TakeOff(user bs.Request) error
 	TransferTo(transf bs.Transfer) error
-	GetBalance() ([]bs.Answer, error)
 	GetBalanceByID(walletID uint64, currency string) (float64, error)
+	GetAllBalancesByID(walletID uint64) ([]bs.WalletCurrency, error)
 }
 
 type Service struct {

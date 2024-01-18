@@ -22,7 +22,8 @@ func (h *Handler) InitRoutes() *gin.Engine {
 		api.POST("/invoice", h.AddToWallet)
 		api.POST("/withdraw", h.TakeFromWallet)
 		api.POST("/transfer", h.TransferTo)
-		api.GET("/balance", h.GetBalance)
+		api.GET("/balance/:wid", h.GetAllBalancesByID)
+		api.GET("/balance/:wid/:cur", h.GetBalanceByID)
 	}
 	
 	return router

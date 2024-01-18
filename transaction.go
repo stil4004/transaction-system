@@ -19,3 +19,8 @@ type Transfer struct {
 	Currency   string  `json:"currency"`
 	Sum        float64 `json:"sum"`
 }
+
+type WalletCurrency struct{
+	Currency string `json:"currency"`
+	Value float64 `json:"value"`
+}

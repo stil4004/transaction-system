@@ -132,12 +132,12 @@ func (s *TransactionService) TakeOff(user bs.Request) error {
 	return s.repo.TakeOff(user)
 }
 
-func (s *TransactionService) GetBalance() ([]bs.Answer, error) {
-	return s.repo.GetBalance()
-}
-
 func (s *TransactionService) GetBalanceByID(walletID uint64, currency string) (float64, error){
 	return s.repo.GetBalanceByID(walletID, currency)
+}
+
+func (s *TransactionService) GetAllBalancesByID(walletID uint64) ([]bs.WalletCurrency, error){
+	return s.repo.GetAllBalancesByID(walletID)
 }
 
 // Для удобства вынес в отдельную функцию создание ошибочной транзакции

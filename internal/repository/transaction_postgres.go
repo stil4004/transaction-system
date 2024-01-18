@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -12,10 +13,16 @@ import (
 const (
 	Status_neg = "Error"
 	Status_pos = "Success"
+	Status_ntrl = "Created"
 )
 
 type TransactionPostgres struct {
 	db *sqlx.DB
+}
+
+type WalletCurrency struct{
+	Currency string `json:"currency"`
+	Value float64 `json:"value"`
 }
 
 func NewTransactionPostgres(db *sqlx.DB) *TransactionPostgres {
@@ -30,6 +37,7 @@ func (r *TransactionPostgres) AddSum(user bs.Request) error {
 	if err != nil {
 		return err
 	}
+	r.UpdateStatus(Status_ntrl, id)
 
 	// Добавляем к уже существующему значению новую сумму
 	st := fmt.Sprintf("UPDATE %s SET value = ROUND (CAST(value AS numeric) + $1, 2) WHERE wallet_id = $2 and currency ILIKE $3", WalletTable)
@@ -49,12 +57,15 @@ func (r *TransactionPostgres) AddWallet(user bs.Request) error {
 	var id int
 	id, err := r.CreateTransaction(user.WalletID, user.Currency, user.Sum)
 	if err != nil {
+		log.Println("error occured while adding transaction to DB: ", err)
 		return err
 	}
+	r.UpdateStatus(Status_ntrl, id)
 
 	_, err = r.db.Exec(`INSERT INTO Wallets (wallet_id, currency, value) VALUES ($1, $2, $3)`, user.WalletID, user.Currency, user.Sum)
 	if err != nil {
 		r.UpdateStatus(Status_neg, id)
+		log.Println("Addwallet on repo: ", err)
 		return err
 	}	
 	r.UpdateStatus(Status_pos, id)
@@ -81,54 +92,29 @@ func (r *TransactionPostgres) TakeOff(user bs.Request) error {
 	return err
 }
 
-// func (r *TransactionPostgres) TransferTo(transf bs.Transfer) error {
-// 	id1, err := r.CreateTransaction(transf.WalletID_from, transf.Currency, transf.Sum)
-// 	if err != nil{
-// 	 	return err
-// 	}
-	
-// 	id2, err := r.CreateTransaction(transf.WalletID_to, transf.Currency, transf.Sum)
-// 	if err != nil{
-// 	 	return err
-// 	}
-
-// 	trans_query := `
-// 	BEGIN;
-// 		UPDATE wallets SET value = value - $1 
-// 			WHERE wallet_id = $2 and currency = $3;
-// 		UPDATE wallets SET value = value + $1 
-// 			WHERE wallet_id = $4 AND currency = $3;
-// 	COMMIT;
-// 	`
-// 	_, err = r.db.Exec(trans_query, transf.Sum, transf.WalletID_from, "%" + transf.Currency + "%", transf.WalletID_to )
-// 	if err != nil {
-// 		r.UpdateStatus(Status_neg, id1)
-// 		r.UpdateStatus(Status_neg, id2)
-// 		return err
-// 	}
-
-// 	r.UpdateStatus(Status_pos, id1)
-// 	r.UpdateStatus(Status_pos, id2)
-
-// 	return err
-// }
-
 func (r *TransactionPostgres) TransferTo(transf bs.Transfer) error {
 	id1, err := r.CreateTransaction(transf.WalletID_from, transf.Currency, transf.Sum)
  	if err != nil{
+		log.Println("TransferTO creating transaction 1 eror: ", err)
  	 	return err
  	}
+	r.UpdateStatus(Status_ntrl, id1)
+
 	
  	id2, err := r.CreateTransaction(transf.WalletID_to, transf.Currency, transf.Sum)
  	if err != nil{
 		r.UpdateStatus(Status_neg, id1)
+		log.Println("TransferTO creating transaction 2 eror: ", err)
  	 	return err
  	}
+	r.UpdateStatus(Status_ntrl, id2)
+
 
 	tx, err := r.db.Begin()
     if err != nil {
 		r.UpdateStatus(Status_neg, id1)
 		r.UpdateStatus(Status_neg, id2)
+		log.Println("TransferTO error on creating sql-transaction occured: ", err)
         return err
     }
 	stmt, err := tx.Prepare(`
@@ -139,6 +125,7 @@ func (r *TransactionPostgres) TransferTo(transf bs.Transfer) error {
 		tx.Rollback()
 		r.UpdateStatus(Status_neg, id1)
 		r.UpdateStatus(Status_neg, id2)
+		log.Println("TransferTO error on first prepare: ", err)
 		return err
 	}	
 	defer stmt.Close()
@@ -147,6 +134,7 @@ func (r *TransactionPostgres) TransferTo(transf bs.Transfer) error {
         tx.Rollback() 
 		r.UpdateStatus(Status_neg, id1)
 		r.UpdateStatus(Status_neg, id2)
+		log.Println("TransferTO error on exec of first upd: ", err)
         return err
     }
 
@@ -158,6 +146,7 @@ func (r *TransactionPostgres) TransferTo(transf bs.Transfer) error {
         tx.Rollback()
 		r.UpdateStatus(Status_neg, id1)
 		r.UpdateStatus(Status_neg, id2)
+		log.Println("TransferTO error on second prepare: ", err)
         return err
     }
     defer stmt.Close()
@@ -166,6 +155,8 @@ func (r *TransactionPostgres) TransferTo(transf bs.Transfer) error {
         tx.Rollback() 
 		r.UpdateStatus(Status_neg, id1)
 		r.UpdateStatus(Status_neg, id2)
+		log.Println("TransferTO error on exec of second upd: ", err)
+
         return err
     }
 
@@ -173,17 +164,6 @@ func (r *TransactionPostgres) TransferTo(transf bs.Transfer) error {
 	r.UpdateStatus(Status_pos, id2)
 
     return tx.Commit()
-}
-
-func (r *TransactionPostgres) GetBalance() ([]bs.Answer, error) {
-	var list []bs.Answer
-
-	query := fmt.Sprintf(`SELECT t2.wallet_id ,t2.usdt, t2.rub, t2.eur FROM %s t2 JOIN 
-		(SELECT wallet_id, status, ROW_NUMBER() OVER (PARTITION BY wallet_id ORDER BY id DESC) 
-		AS rn FROM %s) t1 ON t1.wallet_id = t2.wallet_id WHERE t1.rn = 1 AND t1.status != 'Error'`, WalletTable, TransacitonTable)
-	err := r.db.Select(&list, query)
-
-	return list, err
 }
 
 func (r *TransactionPostgres) UpdateStatus(status string, id int) error {
@@ -212,6 +192,32 @@ func (r *TransactionPostgres) GetBalanceByID(walletID uint64, currency string) (
 		return 0.0, err
 	}
 	return reqBalance, nil
+
+}
+
+func (r *TransactionPostgres) GetAllBalancesByID(walletID uint64) ([]bs.WalletCurrency, error){
+
+	st := fmt.Sprintf("SELECT currency, value FROM %s WHERE wallet_id = $1", WalletTable)
+	rows, err := r.db.Query(st, walletID)
+	defer rows.Close()
+
+	var ans_wallets []bs.WalletCurrency
+
+	for rows.Next() {
+		//var temp uint64
+        var wal bs.WalletCurrency
+        if err := rows.Scan(&wal.Currency, &wal.Value); err != nil {
+            return ans_wallets, err
+        }
+		wal.Currency = strings.TrimSpace(wal.Currency)
+        ans_wallets = append(ans_wallets, wal)
+    }
+
+	if err = rows.Err(); err != nil {
+        return ans_wallets, err
+    }
+
+	return ans_wallets, nil
 
 }
 

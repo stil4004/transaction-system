@@ -11,8 +11,8 @@ type Transactions interface {
 	AddWallet(user bs.Request) error
 	TakeOff(user bs.Request) error
 	TransferTo(transf bs.Transfer) error
-	GetBalance() ([]bs.Answer, error)
 	GetBalanceByID(walletID uint64, currency string) (float64, error)
+	GetAllBalancesByID(walletID uint64) ([]bs.WalletCurrency, error)
 	UpdateStatus(status string, id int) error
 	CreateTransaction(wallet_id uint64, currency string, sum float64) (int, error) 
 	HasCurrency(walletID uint64, currency string) (bool, error)
