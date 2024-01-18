@@ -12,3 +12,10 @@ type Answer struct {
 	Rub        float64 `json:"RUS"`
 	Eur        float64 `json:"EUR"`
 }
+
+type Transfer struct {
+	WalletID_from uint64  `json:"wallet_id_from"`
+	WalletID_to uint64  `json:"wallet_id_to"`
+	Currency   string  `json:"currency"`
+	Sum        float64 `json:"sum"`
+}

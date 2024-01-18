@@ -30,6 +30,24 @@ func (h *Handler) AddToWallet(c *gin.Context) {
 	c.JSON(http.StatusOK, statusResponse{Status: "ok"})
 }
 
+func (h *Handler) TransferTo(c *gin.Context) {
+	var input bs.Transfer
+
+	if err := c.BindJSON(&input); err != nil {
+		NewErrorResponse(c, http.StatusBadRequest, "Problem with request")
+		fmt.Println(err)
+		return
+	}
+
+	err := h.services.Transactions.TransferTo(input)
+
+	if err != nil {
+		NewErrorResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, statusResponse{Status: "ok"})
+}
+
 func (h *Handler) TakeFromWallet(c *gin.Context) {
 	var input bs.Request
 
