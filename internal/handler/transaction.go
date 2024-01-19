@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -85,6 +86,7 @@ func (h *Handler) GetBalanceByID(c *gin.Context) {
 	}
 	currency := c.Param("cur")
 
+	currency = strings.ToUpper(currency)
 	wallet_value, err := h.services.Transactions.GetBalanceByID(uint64(walletid), currency)
 
 	if err != nil {
@@ -93,7 +95,7 @@ func (h *Handler) GetBalanceByID(c *gin.Context) {
 	}
 
 	temp_currency := bs.WalletCurrency{
-		Currency: currency,
+		Currency:currency,
 		Value: wallet_value,
 	}
 
