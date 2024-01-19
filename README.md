@@ -57,3 +57,4 @@
 Возьмем больше средств чем есть на кошельке
 ![Alt text](src/error.png)
 ![Alt text](src/errorDB.png)
+![Alt text](src/errorJSON.png)
