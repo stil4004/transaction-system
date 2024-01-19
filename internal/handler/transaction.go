@@ -20,6 +20,8 @@ type GetWallet struct{
 	Currencies []bs.WalletCurrency `json:"currencies"`
 }
 
+
+// Добавление средств по ручке /invoice
 func (h *Handler) AddToWallet(c *gin.Context) {
 	var input bs.Request
 
@@ -38,6 +40,7 @@ func (h *Handler) AddToWallet(c *gin.Context) {
 	c.JSON(http.StatusOK, statusResponse{Status: "ok"})
 }
 
+//Перевод между счетами по ручке /transfer
 func (h *Handler) TransferTo(c *gin.Context) {
 	var input bs.Transfer
 
@@ -56,6 +59,7 @@ func (h *Handler) TransferTo(c *gin.Context) {
 	c.JSON(http.StatusOK, statusResponse{Status: "ok"})
 }
 
+// Снятие денег со счета /withdraw
 func (h *Handler) TakeFromWallet(c *gin.Context) {
 	var input bs.Request
 
@@ -72,6 +76,7 @@ func (h *Handler) TakeFromWallet(c *gin.Context) {
 	c.JSON(http.StatusOK, statusResponse{Status: "ok"})
 }
 
+// Получение баланса по номеру кошелька И валюте /balance/{wallet_id}/{currency}
 func (h *Handler) GetBalanceByID(c *gin.Context) {
 	walletid, err := strconv.Atoi(c.Param("wid"))
 	if err != nil{
@@ -98,6 +103,7 @@ func (h *Handler) GetBalanceByID(c *gin.Context) {
 	})
 }
 
+// Получение баланса только по номеру кошелька /balance/{wallet_id}/{currency} (выводит все валюты)
 func (h *Handler) GetAllBalancesByID(c *gin.Context) {
 	walletid, err := strconv.Atoi(c.Param("wid"))
 	if err != nil{

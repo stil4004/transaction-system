@@ -1,5 +1,11 @@
 package bs
 
+const(
+	TypeTransaction = "Transaction"
+	TypeInvoice = "Invoice"
+	TypeWithdraw = "Withdraw"
+)
+
 type Request struct {
 	WalletID uint64  `json:"wallet_id" db:"wallet_id"`
 	Currency   string  `json:"currency" db:"currency"`
@@ -24,3 +30,5 @@ type WalletCurrency struct{
 	Currency string `json:"currency"`
 	Value float64 `json:"value"`
 }
+
+

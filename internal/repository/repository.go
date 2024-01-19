@@ -14,7 +14,7 @@ type Transactions interface {
 	GetBalanceByID(walletID uint64, currency string) (float64, error)
 	GetAllBalancesByID(walletID uint64) ([]bs.WalletCurrency, error)
 	UpdateStatus(status string, id int) error
-	CreateTransaction(wallet_id uint64, currency string, sum float64) (int, error) 
+	CreateTransaction(wallet_id uint64, currency string, sum float64, operationType string) (int, error) 
 	HasCurrency(walletID uint64, currency string) (bool, error)
 }
 

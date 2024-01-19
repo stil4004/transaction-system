@@ -9,6 +9,7 @@ import (
 const (
 	TransacitonTable = "Transactions"
 	WalletTable      = "Wallets"
+	TransfersTable = "Transfers"
 )
 
 type Config struct {
